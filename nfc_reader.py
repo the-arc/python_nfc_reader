@@ -2,6 +2,11 @@ import csv
 import RPi.GPIO as GPIO
 from mfrc522 import SimpleMFRC522
 import i2clcda as lcd
+import gspread
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+import time
 from time import sleep
 from datetime import datetime
 
@@ -9,36 +14,51 @@ csv_name = './data.csv'
 text1 = ''
 text2 = ''
 
+# 起動用
 def start():
   # nfc情報を元にuser情報取得
-  user_data = get_user(nfc_read())
+  user = get_user(nfc_read())
   # user情報と日付情報をSDとスプレッドシートに書き込み
-  write(user_data.name, user_data.team, get_date())
+  display_view('wait next touch')
+  write(user, get_date())
+
+# 状態を初期化
+def initialization():
+  global text1
+  global text2
+  text1 = ''
+  text2 = ''
 
 # NFC読み込み idm取得
 def nfc_read():
   reader = SimpleMFRC522()
   try:
-    print('Touch the card!')
-    display_view('Touch the card!')
     id, text = reader.read()
-    print(id)
     display_view(str(id))
-    print(text)
-    print('done.')
-    display_view('done.')
+    display_view('complete!')
   finally:
       GPIO.cleanup()
-  return id
+  return str(id)
 
-# idmからuser取得
+# idmからuser配列取得
 def get_user(idm):
-  return
+  # スプレッドシート操作処理(マスタレコード): 
+  ## シートを取得
+  wks2 = gc.open_by_key(GOOGLE_SHEET_ID).get_worksheet(1)
+  ## シートを配列に格納
+  master_records = wks2.get_all_values() 
+  ## NFCカードのIDからユーザ名を取得して変数に格納
+  for i in range(0, len(master_records)):
+    if master_records[i][0]  == idm:
+      user = master_records[i]
+      break
+  return user
 
 # 現在日時を取得(yyyy/mm/dd HH:MM:SS)
 def get_date():
   return datetime.now().strftime("%Y/%m/%d %H:%M:%S")
 
+# ディスプレイ表示用
 def display_view(t):
   global text1
   global text2
@@ -48,22 +68,33 @@ def display_view(t):
   lcd.lcd_string(text2, lcd.LCD_LINE_2)
 
 # csv,スプレッドシート書き込み
-def write(user, team, date):
-  csv_write(user, team, date)
-  spreadsheet_write(user, team, date)
+def write(user, date):
+  csv_write(user, date)
+  spreadsheet_write(user, date)
 
 ##########################
 # スプレッドシートへ書き込み write関数から呼び出し
-def spreadsheet_write(user, team, date):
-  return
+def spreadsheet_write(user, date):
+  # スプレッドシート操作処理(トランレコード): 
+  ## シートを取得
+  wks1 = gc.open_by_key(GOOGLE_SHEET_ID).get_worksheet(0)
+  ## シートを配列に格納
+  records = wks1.get_all_values()
+  ## シート内に 現在の日付 と NFCカードから取得したユーザ名 を記録
+  wks1.update_cell(len(records)+1, 1, date)
+  wks1.update_cell(len(records)+1, 2, user[1])
+  wks1.update_cell(len(records)+1, 3, user[2])
 
 # csvへ書き込み(user, team, date) write関数から呼び出し
-def csv_write(user, team, date):
-  words = [user, team, date]
+def csv_write(user, date):
+  words = [user[1], user[2], date]
   with open(csv_name, 'a') as f:
     writer = csv.writer(f)
     writer.writerow([words])
 
-#nfc読み込み, csv書き込みテスト
 lcd.lcd_init()
-csv_write(nfc_read(), 'red', get_date())
+while True:
+  display_view('Touch the card!')
+  start()
+  initialization()
+

@@ -83,7 +83,6 @@ def get_raspi_name():
       name = master_records[i][1]
       break
   raspi_name = name
-  print(raspi_name)
 
 # idmからuser配列取得
 def get_user(idm):

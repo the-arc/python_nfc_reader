@@ -6,6 +6,7 @@ import gspread
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+import buzzer
 from time import sleep
 from datetime import datetime
 
@@ -40,6 +41,8 @@ def start():
     if user is None:
       display_view('Not Found!')
     else:
+      #音声モジュールから出力
+      buzzer.sound()
       # user情報と日付情報をSDとスプレッドシートに書き込み
       # 現在日時を取得(yyyy/mm/dd HH:MM:SS)
       write(user, datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
